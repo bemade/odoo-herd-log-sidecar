@@ -6,19 +6,28 @@ verifies it, and streams the merged logs of the pods that the token authorises.
 
 ## STATUS — read this first
 
-**This is a SCAFFOLD / DESIGN deliverable. It has NOT been verified against a
-cluster. Do not deploy as-is.**
+**Functional, but NOT yet verified against a live cluster. Do not deploy until
+the live-streaming path is validated on-cluster.**
 
-- It needs **human review**, a **real git repo/remote** (none configured), and
-  **cluster validation** before it is anything more than a design artifact.
-- **Real and tested:** the token verifier (`token.go`) — it implements the Odoo
-  mint contract byte-for-byte and is covered by `token_test.go` (`go test ./...`
-  passes).
-- **Stubbed:** the Kubernetes pod discovery + log multiplex (`kube.go`). The
-  in-cluster client, scope-driven pod `List`, `Follow:true` log streams, the
-  fan-in channel and per-line flush are wired, but the **pod informer /
-  attach-detach lifecycle is `TODO`** and nothing has been run against a live
-  cluster.
+- It needs **cluster validation** of the live `Follow` multiplex and a
+  **deploy** decision before production use.
+- **Real and tested:**
+  - the token verifier (`token.go`) — implements the Odoo mint contract
+    byte-for-byte, covered by `token_test.go`;
+  - the `/stream` auth gate (`main.go`) — missing/malformed/bad-sig/expired
+    tokens are rejected with 401 **before any kube call**; a valid token reaches
+    the kube path with scope taken **only** from the verified payload
+    (`main_test.go`);
+  - pod **discovery** scoping — ns + label-selector filtering returns exactly
+    the matching pods and excludes other instances / other namespaces, tested
+    with `k8s.io/client-go/kubernetes/fake` (`kube_test.go`);
+  - the Stern attach/detach bookkeeping (idempotent attach, non-running pods
+    skipped, detach forgets) (`kube_test.go`).
+- **Implemented but only verifiable on a real cluster:** the live `Follow:true`
+  log multiplex itself — per-container streams, the fan-in channel, per-line
+  flush, the informer add/update/delete attach-detach lifecycle, and per-pod
+  retry/backoff. The fake clientset does **not** implement the `pods/log`
+  subresource, so this path cannot be exercised headless.
 - The **react-logviewer SPA** front-end (served from `logs.bemade.org`) is
   **described but not built**.
 
@@ -34,8 +43,35 @@ The authoritative design + token contract is in the Odoo module at
    URL).
 3. The SPA opens `fetch("/stream", {headers:{Authorization:"Bearer <token>"}})`.
 4. The sidecar verifies the token (HMAC-SHA256, constant-time, expiry), then
-   derives scope **only** from the verified payload, lists matching pods, tails
-   their logs (`Follow:true`), multiplexes them, and streams merged lines back.
+   derives scope **only** from the verified payload, watches matching pods via a
+   SharedInformer, tails their logs (`Follow:true`, `TailLines:200`),
+   multiplexes them, and streams merged lines back — attaching new pods
+   (rollouts, `-cron`, transient Job pods) and detaching deleted ones (Stern
+   pattern). Client disconnect (request-context cancel) tears down the informer
+   and every per-pod stream.
+
+## Wire format
+
+`/stream` responds with `Content-Type: application/x-ndjson` — a single
+long-lived HTTP response whose body is **newline-delimited JSON**: one JSON
+object per line.
+
+Log line:
+
+```json
+{"pod":"alpha-prod-web-abc","container":"odoo","line":"...","ts":"2026-01-02T15:04:05.123456789Z"}
+```
+
+Heartbeat (emitted every ~20 s to keep idle connections / proxies alive):
+
+```json
+{"heartbeat":true,"ts":"2026-01-02T15:04:25Z"}
+```
+
+`ts` is the sidecar's receive time (RFC3339Nano). NDJSON is chosen over SSE
+because the SPA opens the stream with `fetch()` + a `ReadableStream` reader so
+the token can ride in an `Authorization: Bearer` header (EventSource/SSE cannot
+set arbitrary headers). See `odoo_herd_portal/docs/SIDECAR.md` §5.
 
 ## Configuration
 
@@ -47,10 +83,34 @@ The authoritative design + token contract is in the Odoo module at
 ## Build & test
 
 ```sh
-go test ./...        # token verifier tests
+go test ./...        # token verifier + handler-auth + pod-discovery tests
 go build ./...
+go vet ./...
 docker build -t odoo-herd-log-sidecar:dev .
 ```
+
+## Run locally against a cluster (KUBECONFIG fallback)
+
+The sidecar uses `rest.InClusterConfig()` in production and falls back to
+`KUBECONFIG` (or `~/.kube/config`) when run off-cluster, so you can point it at a
+real cluster from your laptop. You need the **same** 64-hex secret Odoo holds in
+`ir.config_parameter` under `odoo_herd_portal.log_token_secret`, and a token
+minted by Odoo for an instance you can reach.
+
+```sh
+# 1. Run the sidecar (uses ~/.kube/config; current kube context = target cluster)
+LOG_TOKEN_SECRET=<64-hex secret> go run .
+#   …or with an explicit kubeconfig / listen addr:
+# KUBECONFIG=/path/to/kubeconfig LISTEN_ADDR=:8080 LOG_TOKEN_SECRET=<secret> go run .
+
+# 2. Mint a token from Odoo (portal page does this via _mint_log_token), then:
+curl -N -H "Authorization: Bearer <token>" http://localhost:8080/stream
+#   -N disables curl buffering so you see lines as they stream (NDJSON).
+```
+
+Off-cluster, your kubeconfig identity must have `get,list,watch` on pods and
+`get` on `pods/log` in the target namespace (in production the sidecar's own
+least-privilege ServiceAccount provides exactly this — see `deploy/rbac.yaml`).
 
 ## Deploy (after review + cluster validation)
 
@@ -69,9 +129,11 @@ Manifests in `deploy/` (namespace `odoo-herd`):
 ```
 .
 ├── main.go          # HTTP server: /healthz, /stream (token verify + stream)
+├── main_test.go     # /stream auth gate: reject before kube; scope from token only
 ├── token.go         # HMAC-SHA256 scope-token verifier (REAL, contract-exact)
 ├── token_test.go    # mints tokens as Odoo does; valid/tampered/expired cases
-├── kube.go          # pod discovery + log multiplex (Stern pattern, STUBBED)
+├── kube.go          # pod discovery + Follow log multiplex (Stern pattern)
+├── kube_test.go     # pod-discovery scoping + attach/detach (fake clientset)
 ├── go.mod / go.sum
 ├── Dockerfile       # multi-stage, distroless/nonroot static build
 └── deploy/
