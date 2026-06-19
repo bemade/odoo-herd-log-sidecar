@@ -1,3 +1,5 @@
+// License LGPL-3.0 or later (http://www.gnu.org/licenses/lgpl).
+
 // Command odoo-herd-log-sidecar is an in-cluster log-stream sidecar for the
 // Odoo Herd portal's Feature C live log viewer.
 //
