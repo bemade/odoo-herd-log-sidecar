@@ -22,8 +22,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: log-sidecar
-          # TODO: replace with the published image ref once a real registry/repo exists.
-          image: registry.bemade.org/odoo-herd-log-sidecar:latest
+          image: ghcr.io/bemade/odoo-herd-log-sidecar:latest
           ports:
             - name: http
               containerPort: 8080

@@ -4,6 +4,8 @@ In-cluster log-stream sidecar for the Odoo Herd portal's **Feature C** live log
 viewer. It accepts a short-lived, HMAC-signed scope token minted by Odoo,
 verifies it, and streams the merged logs of the pods that the token authorises.
 
+Licensed under **LGPL-3.0-or-later** (see `LICENSE`). Author: Bemade Inc.
+
 ## STATUS — read this first
 
 **Functional, but NOT yet verified against a live cluster. Do not deploy until
@@ -114,13 +116,21 @@ least-privilege ServiceAccount provides exactly this — see `deploy/rbac.yaml`)
 
 ## Deploy (after review + cluster validation)
 
-Manifests in `deploy/` (namespace `odoo-herd`):
+The container image is published to `ghcr.io/bemade/odoo-herd-log-sidecar` by the
+release-please workflow (multi-arch, push-by-digest). The production Kubernetes
+manifests live in the cluster GitOps repo under **`kube-gitops/log-sidecar/`** —
+that is the source of truth applied to the cluster.
+
+The `deploy/` directory in this repo holds reference copies of those manifests
+(namespace `odoo-herd`):
 
 - `rbac.yaml` — least-privilege `ServiceAccount` + `ClusterRole`
   (`get,list,watch` pods, `get` pods/log) + `ClusterRoleBinding`. No exec, no
   secrets, no kubeconfig.
-- `deployment.yaml` — `Deployment` + the shared-secret `Secret`
-  (`log-sidecar-token-secret`, placeholder value — populate out of band).
+- `deployment.yaml` — `Deployment` (image `ghcr.io/bemade/odoo-herd-log-sidecar:latest`)
+  + the shared-secret `Secret` (`log-sidecar-token-secret`, **placeholder value
+  only** — the real 64-hex secret is populated out of band via
+  sealed-secret / external-secrets, never committed here).
 - `service.yaml` — `Service`.
 - `ingress.yaml` — Traefik + cert-manager TLS, host `logs.bemade.org`.
 
@@ -136,6 +146,11 @@ Manifests in `deploy/` (namespace `odoo-herd`):
 ├── kube_test.go     # pod-discovery scoping + attach/detach (fake clientset)
 ├── go.mod / go.sum
 ├── Dockerfile       # multi-stage, distroless/nonroot static build
+├── LICENSE          # LGPL-3.0
+├── release-please-config.json / .release-please-manifest.json
+├── .github/workflows/
+│   ├── build.yml          # CI: gofmt + build + vet + test + golangci-lint
+│   └── release-please.yml # release-please → multi-arch image push-by-digest to GHCR
 └── deploy/
     ├── rbac.yaml
     ├── deployment.yaml
