@@ -1,0 +1,32 @@
+# Traefik ingress with cert-manager TLS for the log-stream sidecar.
+# Host logs.bemade.org. The react-logviewer SPA and the /stream + /healthz
+# endpoints are served behind this host (the SPA front-end is described in
+# docs/SIDECAR.md §5 but NOT built in this scaffold).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: log-sidecar
+  namespace: odoo-herd
+  annotations:
+    # cert-manager: issue/renew the TLS cert.
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    # Traefik entrypoint (websecure / 443).
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - logs.bemade.org
+      secretName: log-sidecar-tls
+  rules:
+    - host: logs.bemade.org
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: log-sidecar
+                port:
+                  number: 80

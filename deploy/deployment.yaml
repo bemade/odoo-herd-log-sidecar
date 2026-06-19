@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: log-sidecar
+  namespace: odoo-herd
+  labels:
+    app: log-sidecar
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: log-sidecar
+  template:
+    metadata:
+      labels:
+        app: log-sidecar
+    spec:
+      serviceAccountName: log-sidecar
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: log-sidecar
+          # TODO: replace with the published image ref once a real registry/repo exists.
+          image: registry.bemade.org/odoo-herd-log-sidecar:latest
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: LISTEN_ADDR
+              value: ":8080"
+            # The HMAC secret is the SAME 64-hex value Odoo holds in
+            # ir.config_parameter "odoo_herd_portal.log_token_secret".
+            # It is shared out of band via the k8s Secret below.
+            - name: LOG_TOKEN_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: log-sidecar-token-secret
+                  key: log_token_secret
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+---
+# The shared HMAC secret. Its value MUST equal Odoo's
+# ir.config_parameter "odoo_herd_portal.log_token_secret" (64 hex chars).
+# Populate it out of band (sealed-secret / external-secrets / manual);
+# the placeholder below is NOT a real secret.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: log-sidecar-token-secret
+  namespace: odoo-herd
+type: Opaque
+stringData:
+  log_token_secret: "REPLACE_WITH_THE_SHARED_64_HEX_SECRET"

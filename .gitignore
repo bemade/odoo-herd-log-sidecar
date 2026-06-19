@@ -1,0 +1,10 @@
+# Build output
+/log-sidecar
+/out/
+
+# Go test/coverage
+*.out
+*.test
+
+# Stray local build binary (module-named)
+/odoo-herd-log-sidecar

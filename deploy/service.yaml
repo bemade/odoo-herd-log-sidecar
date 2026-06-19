@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: log-sidecar
+  namespace: odoo-herd
+  labels:
+    app: log-sidecar
+spec:
+  selector:
+    app: log-sidecar
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
