@@ -1,10 +1,20 @@
-# Build output
+# Compiled binaries / build output
 /log-sidecar
 /out/
+# Stray local build binary (module-named, produced by `go build`)
+/odoo-herd-log-sidecar
 
-# Go test/coverage
+# Go test / coverage / profiling artifacts
 *.out
 *.test
+*.prof
+coverage.txt
 
-# Stray local build binary (module-named)
-/odoo-herd-log-sidecar
+# Go workspace file (machine-local)
+go.work
+go.work.sum
+
+# Editor / OS cruft
+*.swp
+*.swo
+.DS_Store
