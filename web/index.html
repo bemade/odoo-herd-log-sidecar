@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<!-- License LGPL-3.0 or later (http://www.gnu.org/licenses/lgpl). -->
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="robots" content="noindex,nofollow"/>
+  <title>Live logs</title>
+  <link rel="stylesheet" href="app.css"/>
+</head>
+<body>
+  <!-- SPA-MARKER: odoo-herd-log-sidecar viewer -->
+  <header id="toolbar">
+    <div class="status" id="status" data-state="idle">
+      <span class="dot"></span>
+      <span class="label" id="statusLabel">Waiting for token</span>
+    </div>
+
+    <input type="search" id="filter" placeholder="Filter (substring)&hellip;" autocomplete="off" spellcheck="false"/>
+
+    <label class="follow">
+      <input type="checkbox" id="follow" checked/>
+      Follow tail
+    </label>
+
+    <button id="resume" type="button" hidden>Resume</button>
+    <button id="clear" type="button">Clear</button>
+  </header>
+
+  <div id="pods" class="pods" aria-label="Pod / container filters"></div>
+
+  <div class="notice">
+    <strong>Recent logs only.</strong>
+    Live and recently-buffered lines are shown (last ~200 per container on
+    connect, capped to the most recent 5000 here). History search beyond the
+    node's retention window is not available.
+  </div>
+
+  <main id="log" class="log" tabindex="0" aria-live="polite"></main>
+
+  <div id="waiting" class="waiting">
+    Waiting for an access token from the portal. Open this viewer from your
+    instance's <em>Live logs</em> page rather than directly.
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

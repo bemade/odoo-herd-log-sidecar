@@ -1,0 +1,189 @@
+/* License LGPL-3.0 or later (http://www.gnu.org/licenses/lgpl). */
+:root {
+  --bg: #1e1e1e;
+  --bg-alt: #252526;
+  --bg-toolbar: #2d2d30;
+  --fg: #d4d4d4;
+  --fg-dim: #858585;
+  --border: #3c3c3c;
+  --accent: #0e639c;
+  --tag-bg: #37373d;
+  --tag-fg: #9cdcfe;
+  --hl-bg: #6b5400;
+  --hl-fg: #fff;
+  --ok: #4ec9b0;
+  --warn: #d7ba7d;
+  --err: #f48771;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  font: 13px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+}
+
+#toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--bg-toolbar);
+  border-bottom: 1px solid var(--border);
+  flex: 0 0 auto;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.status .dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--fg-dim);
+  flex: 0 0 auto;
+}
+
+.status[data-state="connecting"] .dot { background: var(--warn); animation: pulse 1s infinite; }
+.status[data-state="streaming"]  .dot { background: var(--ok); }
+.status[data-state="disconnected"] .dot { background: var(--warn); }
+.status[data-state="error"] .dot { background: var(--err); }
+
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+
+#filter {
+  flex: 1 1 auto;
+  min-width: 120px;
+  padding: 5px 8px;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-family: var(--mono);
+}
+#filter:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+
+.follow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--fg-dim);
+  cursor: pointer;
+}
+
+#toolbar button {
+  padding: 5px 10px;
+  background: var(--bg-alt);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+}
+#toolbar button:hover { background: var(--border); }
+#resume { border-color: var(--accent); color: var(--tag-fg); }
+
+.pods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--bg-toolbar);
+  border-bottom: 1px solid var(--border);
+  flex: 0 0 auto;
+}
+.pods:empty { display: none; }
+
+.pod-chip {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--tag-bg);
+  color: var(--fg-dim);
+  border: 1px solid transparent;
+  cursor: pointer;
+  user-select: none;
+}
+.pod-chip.on { color: var(--tag-fg); border-color: var(--accent); background: var(--bg); }
+
+.notice {
+  padding: 6px 10px;
+  background: #2a2a1c;
+  color: var(--warn);
+  font-size: 11.5px;
+  border-bottom: 1px solid var(--border);
+  flex: 0 0 auto;
+}
+
+.log {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: auto;
+  padding: 4px 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  white-space: pre;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  padding: 0 10px;
+  align-items: baseline;
+}
+.row:hover { background: var(--bg-alt); }
+.row.hidden { display: none; }
+
+.row .ts {
+  color: var(--fg-dim);
+  flex: 0 0 auto;
+  font-size: 11px;
+}
+.row .tag {
+  flex: 0 0 auto;
+  background: var(--tag-bg);
+  color: var(--tag-fg);
+  border-radius: 3px;
+  padding: 0 5px;
+  font-size: 11px;
+}
+.row .msg {
+  flex: 1 1 auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.row .msg mark {
+  background: var(--hl-bg);
+  color: var(--hl-fg);
+  border-radius: 2px;
+}
+
+.waiting {
+  padding: 24px;
+  margin: auto;
+  max-width: 460px;
+  text-align: center;
+  color: var(--fg-dim);
+  font-size: 13px;
+}
+.waiting em { color: var(--fg); font-style: normal; }
+/* Hidden once a token-driven session begins. */
+body.has-token .waiting { display: none; }
+body:not(.has-token) .log { display: none; }

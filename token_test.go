@@ -3,36 +3,17 @@
 package main
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"testing"
 	"time"
 )
 
-// mintToken constructs a token EXACTLY as the Odoo side does
-// (K8sOdooInstance._mint_log_token):
-//
-//	payload_b64 = b64url( json.dumps(payload, separators=(",",":"), sort_keys=True) )
-//	sig         = b64url( HMAC_SHA256(secret_utf8, payload_b64_ascii) )
-//	token       = payload_b64 "." sig
-//
-// Go's encoding/json marshals struct fields in declaration order and
-// json.Marshal uses compact separators by default, so declaring the Scope
-// fields in sorted key order (exp, iat, iid, ns, sel) reproduces Python's
-// sort_keys=True compact output byte-for-byte.
+// mintToken wraps MintToken (the shared mint helper in token.go, also used by
+// cmd/mint-token) for the tests.
 func mintToken(t *testing.T, secret string, s Scope) string {
 	t.Helper()
-	raw, err := json.Marshal(s)
-	if err != nil {
-		t.Fatalf("marshal payload: %v", err)
-	}
-	payloadB64 := base64.RawURLEncoding.EncodeToString(raw)
-	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write([]byte(payloadB64))
-	sigB64 := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
-	return payloadB64 + "." + sigB64
+	return MintToken(secret, s)
 }
 
 const testSecret = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" // 64 hex chars
