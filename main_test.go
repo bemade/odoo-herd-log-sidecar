@@ -117,6 +117,53 @@ func TestStreamValidTokenReachesKubePath(t *testing.T) {
 	}
 }
 
+// TestServeIndex asserts the embedded SPA is served at "/" with the expected
+// marker string, exercising the //go:embed + http.FileServerFS wiring.
+func TestServeIndex(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.Handle("/", http.FileServerFS(webRoot()))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /: status = %d, want 200", rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "SPA-MARKER: odoo-herd-log-sidecar viewer") {
+		t.Errorf("GET / body missing SPA marker; got first 200 bytes: %q", body[:min(200, len(body))])
+	}
+	if ct := rec.Header().Get("Content-Type"); !strings.Contains(ct, "text/html") {
+		t.Errorf("GET / Content-Type = %q, want text/html…", ct)
+	}
+}
+
+// TestServeIndexDoesNotShadowEndpoints asserts the catch-all "/" file server
+// does not shadow the exact "/healthz" and "/stream" patterns.
+func TestServeIndexDoesNotShadowEndpoints(t *testing.T) {
+	srv, _, _ := newTestServer(testSecret)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/healthz", srv.handleHealthz)
+	mux.HandleFunc("/stream", srv.handleStream)
+	mux.Handle("/", http.FileServerFS(webRoot()))
+
+	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || rec.Body.String() != "ok" {
+		t.Errorf("/healthz: status=%d body=%q, want 200 \"ok\"", rec.Code, rec.Body.String())
+	}
+
+	// /stream with no token must still 401 (not be served as a static file).
+	req = httptest.NewRequest(http.MethodGet, "/stream", nil)
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("/stream without token: status=%d, want 401", rec.Code)
+	}
+}
+
 // TestStreamScopeNotFromRequestParams asserts a request query/param cannot
 // influence scope: the only authority is the token payload. Even if a caller
 // appends ?ns=evil&sel=evil, the handler ignores it.

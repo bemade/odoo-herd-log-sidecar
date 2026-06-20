@@ -12,6 +12,8 @@ package main
 
 import (
 	"context"
+	"embed"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -19,6 +21,24 @@ import (
 )
 
 const tokenSecretEnv = "LOG_TOKEN_SECRET"
+
+// webFS holds the embedded vanilla HTML/JS/CSS viewer SPA served at "/". It is
+// a self-contained, dependency-free single-page app (no npm/React build) so the
+// sidecar stays a single static binary.
+//
+//go:embed web
+var webFS embed.FS
+
+// webRoot is webFS rooted at the "web" directory so files are served at "/" and
+// "/app.js" rather than "/web/app.js".
+func webRoot() fs.FS {
+	sub, err := fs.Sub(webFS, "web")
+	if err != nil {
+		// Unreachable: "web" is embedded at build time.
+		log.Fatalf("embed web: %v", err)
+	}
+	return sub
+}
 
 func main() {
 	secret := os.Getenv(tokenSecretEnv)
@@ -36,6 +56,10 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", srv.handleHealthz)
 	mux.HandleFunc("/stream", srv.handleStream)
+	// Serve the embedded viewer SPA at "/". The exact "/healthz" and "/stream"
+	// patterns above take precedence in http.ServeMux, so this catch-all does
+	// not shadow them.
+	mux.Handle("/", http.FileServerFS(webRoot()))
 
 	httpSrv := &http.Server{
 		Addr:    addr,

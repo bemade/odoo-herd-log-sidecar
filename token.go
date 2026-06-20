@@ -41,6 +41,27 @@ func b64urlDecode(segment string) ([]byte, error) {
 	return base64.URLEncoding.DecodeString(segment)
 }
 
+// MintToken constructs a sidecar scope token EXACTLY as the Odoo side does
+// (K8sOdooInstance._mint_log_token):
+//
+//	payload_b64 = b64url( json.dumps(payload, separators=(",",":"), sort_keys=True) )
+//	sig         = b64url( HMAC_SHA256(secret_utf8, payload_b64_ascii) )
+//	token       = payload_b64 "." sig
+//
+// Go's encoding/json marshals struct fields in declaration order, and the Scope
+// fields are declared in sorted key order (exp, iat, iid, ns, sel) with compact
+// separators by default — reproducing Python's sort_keys=True compact output
+// byte-for-byte. This is the single source of truth shared by the unit tests
+// and the cmd/mint-token dev CLI.
+func MintToken(secret string, s Scope) string {
+	raw, _ := json.Marshal(s)
+	payloadB64 := base64.RawURLEncoding.EncodeToString(raw)
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(payloadB64))
+	sigB64 := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+	return payloadB64 + "." + sigB64
+}
+
 // VerifyToken validates a sidecar scope token against the shared secret and
 // returns the decoded payload. It implements, byte-for-byte, the contract minted
 // by K8sOdooInstance._mint_log_token and verified by the reference _verify_token
