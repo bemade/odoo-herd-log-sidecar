@@ -4,6 +4,9 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY *.go ./
+# Static assets embedded via //go:embed web (the viewer SPA) — must be in the
+# build context or the embed fails the build.
+COPY web ./web
 # Static build so it runs in a distroless/scratch base.
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /out/log-sidecar .
 
