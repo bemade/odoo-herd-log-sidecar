@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/bemade/odoo-herd-log-sidecar/compare/v0.2.0...v0.2.1) (2026-06-20)
+
+
+### Bug Fixes
+
+* copy go:embed web assets into the Docker image build ([05d00d6](https://github.com/bemade/odoo-herd-log-sidecar/commit/05d00d643eccacf4cf0095623ffaae4026568e7f))
+
 ## [0.2.0](https://github.com/bemade/odoo-herd-log-sidecar/compare/v0.1.1...v0.2.0) (2026-06-20)
 
 
